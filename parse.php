@@ -47,8 +47,19 @@
         "label"     => array("label"),
         "type"      => array("type"),
     );
-        
 
+    $pattern_regex = array(
+        "var"       => "/^(LF|GF|TF)@[\_\-\$\&\%\*\!\?a-zA-Z][\_\-\$\&\%\*\!\?a-zA-Z0-9]*$/",
+        "int"       => "/^int@[+-]?\d*(\.\d*)?$/",
+        "bool"      => "/^bool@(true|false)$/",
+        "string"    => "/^string@([\\\\]\d{3}|[^\\\\\#\s])*$/",
+        "nil"       => "/^nil@nil$/",
+        "label"     => "/^[\_\$\-\*\?\!\%a-zA-Z][\_\$\-\*\?\!\%a-zA-Z0-9]*$/",
+        "type"      => "/^(int|bool|string|nil)$/"
+    );
+
+        
+    
     function check_parameters() {
         global $argc, $argv;
         if ($argc > 1) {
@@ -64,6 +75,7 @@
         }
     }
 
+    # Checks if first code in file is header
     function check_header() {
         # Iterates through all blank lines
         while (($line=fgets(STDIN)) && preg_match('/^\s*$/', $line)) {}
@@ -75,31 +87,44 @@
         }
     }
 
+    # Function that checks if symb is correct
+    function check_symb_argument($checked_segment) {
+        global $arg_types, $pattern_regex,$type_of_symb;
+        foreach ($arg_types["symb"] as $type_of_symb) {
+            if (preg_match($pattern_regex[$type_of_symb], $checked_segment)) {
+                #echo "SUCCESS: ".$type_of_symb."\n";
+                $type=$type_of_symb;
+                return true;
+            }
+        }
+        exit(22);
+    }
+
+    # Initialize xml document
     function init_xml() {
         global $xw;
-        $xw = xmlwriter_open_memory();
-        xmlwriter_set_indent($xw, 1);
-        $res = xmlwriter_set_indent_string($xw, ' ');
-        
-        xmlwriter_start_document($xw, '1.0', 'UTF-8');
-
-        xmlwriter_start_element($xw, 'program');
-        xmlwriter_write_attribute($xw, 'language', 'IPPcode23');
+        $xw = new XMLWriter();
+        $xw->openMemory();
+        $xw->startDocument("1.0", "UTF-8");
+        $xw->setIndent(1);
+        $xw->startElement("program");
+        $xw->writeAttribute("language", "IPPCode23");
     }
 
     function end_xml() {
         global $xw;
-        xmlwriter_end_attribute($xw);
-        xmlwriter_end_document($xw);
-        echo xmlwriter_output_memory($xw);
+        $xw->endElement();
+        $xw->endDocument();
+        echo $xw->flush();
     }
 
     $fnc_counter=0;
-    
+    $symb_type;
     check_parameters();
     check_header();
     init_xml();
 
+    # Read file line by line
     while ($line = fgets(STDIN)) {
         # Skip empty lines
         if (!empty($line)) {
@@ -119,30 +144,55 @@
                 exit(22);
             }
 
-            # Check if function has correct number of parameters
-            if ($arg_num == 1){
-                if ($arg_num!== count($function_list[$function])) {
-                    echo "Error 23: Wrong number of parameters given to function ". $function . "\n";
-                    exit(23);
+            # 
+            if ($arg_num == count($function_list[$function])) {
+            
+                if ($arg_num == 0){
+                    $xw->startElement("instruction");
+                    $xw->writeAttribute("order", $fnc_counter);
+                    $xw->writeAttribute("opcode", $function);
                 }
-                xmlwriter_start_element($xw, "instruction");
-                xmlwriter_write_attribute($xw, "order", $fnc_counter);
-                xmlwriter_write_attribute($xw, "opcode", $function);    
+                else {
+                    $xw->startElement("instruction");
+                    $xw->writeAttribute("order", $fnc_counter);
+                    $xw->writeAttribute("opcode", $function);
+                    # iterate parameters and check if correct type
+                    $cnt=0;
+                    foreach ($function_list[$function] as $fnc_args) {
+                        $cnt++;
+                        #echo $cnt . ": ".$fnc_args. " \"$segments[$cnt]\""."\n";
+                        switch ($fnc_args) {
+                            case "symb":
+                                if (!check_symb_argument($segments[$cnt])) {
+                                    echo "Error:\n";
+                                }
+                                $xw->startElement("arg" . $cnt);
+                                $xw->writeAttribute("type", $type_of_symb);
+                                $value = explode('@', $segments[$cnt])[1];
+                                $xw->text($value);
+                                $xw->endElement();
+                                break;
+                            case "var":
+                            case "label":
+                            case "type":
+                                if (!preg_match($pattern_regex[$fnc_args], $segments[$cnt])) {
+                                    echo "Error:\n";
+                                }
+                                $xw->startElement("arg" . $cnt);
+                                $xw->writeAttribute("type", $fnc_args);
+                                $xw->text($segments[$cnt]);
+                                $xw->endElement();
+                                break;
+                        }
+                    }
+                    
+                }
             }
             else {
-                xmlwriter_start_element($xw, "instruction");
-                xmlwriter_write_attribute($xw, "order", $fnc_counter);
-                xmlwriter_write_attribute($xw, "opcode", $function);
-                # iterate parameters and check if correct type
-                for ($i=1; $i <= $arg_num; $i++) {
-                    /*if preg_match($regex[$function_list[$function[i]]], $segments[$i]) { # dodelat regularni vyrazy
-
-                    }*/
-                }
+                echo "Error 23: Wrong number of parameters given to function ". $function . "\n";
+                exit(23);
             }
-            
-
-                         
+            $xw->endElement();    
         }
     }
     end_xml();
