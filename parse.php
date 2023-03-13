@@ -4,41 +4,41 @@
     global $xw;
 
     $function_list = array(
-        'MOVE'          => array("var", "symb"),
-        'CREATEFRAME'   => array(),
-        'PUSHFRAME'     => array(),
-        'POPFRAME'      => array(),
-        'DEFVAR'        => array("var"),
-        'CALL'          => array("label"),
-        'RETURN'        => array(),
-        'PUSHS'         => array("symb"),
-        'POPS'          => array("var"),
-        'ADD'           => array("var", "symb", "symb"),
-        'SUB'           => array("var", "symb", "symb"),
-        'MUL'           => array("var", "symb", "symb"),
-        'IDIV'          => array("var", "symb", "symb"),
-        'LT'            => array("var", "symb", "symb"),
-        'GT'            => array("var", "symb", "symb"),
-        'EQ'            => array("var", "symb", "symb"),
-        'AND'           => array("var", "symb", "symb"),
-        'OR'            => array("var", "symb", "symb"),
-        'NOT'           => array("var", "symb"),
-        'INT2CHAR'      => array("var", "symb"),
-        'STRI2INT'      => array("var", "symb", "symb"),
-        'READ'          => array("var", "type"),
-        'WRITE'         => array("symb"),
-        'CONCAT'        => array("var", "symb", "symb"),
-        'STRLEN'        => array("var", "symb"),
-        'GETCHAR'       => array("var", "symb", "symb"),
-        'SETCHAR'       => array("var", "symb", "symb"),
-        "type"          => array("var", "symb"),
-        "label"         => array("label"),
-        'JUMP'          => array("label"),
-        'JUMPIFEQ'      => array("label", "symb", "symb"),
-        'JUMPIFNEQ'     => array("label", "symb", "symb"),
-        'EXIT'          => array("symb"),
-        'DPRINT'        => array("symb"),
-        'BREAK'         => array(),
+        "MOVE"          => array("var", "symb"),
+        "CREATEFRAME"   => array(),
+        "PUSHFRAME"     => array(),
+        "POPFRAME"      => array(),
+        "DEFVAR"        => array("var"),
+        "CALL"          => array("label"),
+        "RETURN"        => array(),
+        "PUSHS"         => array("symb"),
+        "POPS"          => array("var"),
+        "ADD"           => array("var", "symb", "symb"),
+        "SUB"           => array("var", "symb", "symb"),
+        "MUL"           => array("var", "symb", "symb"),
+        "IDIV"          => array("var", "symb", "symb"),
+        "LT"            => array("var", "symb", "symb"),
+        "GT"            => array("var", "symb", "symb"),
+        "EQ"            => array("var", "symb", "symb"),
+        "AND"           => array("var", "symb", "symb"),
+        "OR"            => array("var", "symb", "symb"),
+        "NOT"           => array("var", "symb"),
+        "INT2CHAR"      => array("var", "symb"),
+        "STRI2INT"      => array("var", "symb", "symb"),
+        "READ"          => array("var", "type"),
+        "WRITE"         => array("symb"),
+        "CONCAT"        => array("var", "symb", "symb"),
+        "STRLEN"        => array("var", "symb"),
+        "GETCHAR"       => array("var", "symb", "symb"),
+        "SETCHAR"       => array("var", "symb", "symb"),
+        "TYPE"          => array("var", "symb"),
+        "LABEL"         => array("label"),
+        "JUMP"          => array("label"),
+        "JUMPIFEQ"      => array("label", "symb", "symb"),
+        "JUMPIFNEQ"     => array("label", "symb", "symb"),
+        "EXIT"          => array("symb"),
+        "DPRINT"        => array("symb"),
+        "BREAK"         => array(),
     );
 
     $arg_types = array(
@@ -66,7 +66,7 @@
             if ($argv[1] == "--help") {
                 if ($argc == 2) {
                     echo "Use: parse.php [options] < input\n";
-                    exit;
+                    exit(10);
                 }
                 echo "Error 10: can't combine --help with other parameters\n";
                 exit(10);
@@ -78,9 +78,9 @@
     # Checks if first code in file is header
     function check_header() {
         # Iterates through all blank lines
-        while (($line=fgets(STDIN)) && preg_match('/^\s*$/', $line)) {}
-        
-        $header = explode(" ", trim($line, " \n"));
+        while (($line=fgets(STDIN)) && preg_match('/^(\s*$)|^\s*#.*$/', $line)) {}
+        $header = preg_replace('/#.*$/', '', $line);
+        $header = explode(" ", trim($header, " \n"));
         if ($header[0] !== ".IPPcode23") {
             echo "Error 21: Missing header or code before header\n";
             exit(21);
@@ -97,7 +97,7 @@
                 return true;
             }
         }
-        exit(22);
+        exit(23);
     }
 
     # Initialize xml document
@@ -108,7 +108,7 @@
         $xw->startDocument("1.0", "UTF-8");
         $xw->setIndent(1);
         $xw->startElement("program");
-        $xw->writeAttribute("language", "IPPCode23");
+        $xw->writeAttribute("language", "IPPcode23");
     }
 
     function end_xml() {
@@ -126,13 +126,11 @@
 
     # Read file line by line
     while ($line = fgets(STDIN)) {
+        $line = preg_replace('/#.*$/', '', $line);
         # Skip empty lines
         if (!empty($line)) {
             global $xw;
             $fnc_counter++;
-            # Remove comments from line
-            $line = preg_replace('/#.*/', '', $line);
-
             # Divide line by whitespace and trim newlines
             $segments = explode(" ", trim($line, " \n"));
             $function = strtoupper($segments[0]);
@@ -140,11 +138,11 @@
 
             # Check if function is valid and exists
             if (!key_exists($function, $function_list)) {
-                echo "Error 22: Unknown function\n";
+                echo "Error 22: Unknown function $function\n";
                 exit(22);
             }
 
-            # 
+            # Check number of arguments given
             if ($arg_num == count($function_list[$function])) {
             
                 if ($arg_num == 0){
@@ -160,15 +158,17 @@
                     $cnt=0;
                     foreach ($function_list[$function] as $fnc_args) {
                         $cnt++;
-                        #echo $cnt . ": ".$fnc_args. " \"$segments[$cnt]\""."\n";
                         switch ($fnc_args) {
                             case "symb":
                                 if (!check_symb_argument($segments[$cnt])) {
-                                    echo "Error:\n";
+                                    exit(23);
                                 }
                                 $xw->startElement("arg" . $cnt);
                                 $xw->writeAttribute("type", $type_of_symb);
-                                $value = explode('@', $segments[$cnt])[1];
+                                $value = $segments[$cnt];
+                                if ($type_of_symb != "var") {
+                                    $value = explode('@', $segments[$cnt])[1];
+                                }
                                 $xw->text($value);
                                 $xw->endElement();
                                 break;
@@ -176,7 +176,7 @@
                             case "label":
                             case "type":
                                 if (!preg_match($pattern_regex[$fnc_args], $segments[$cnt])) {
-                                    echo "Error:\n";
+                                    exit(23);
                                 }
                                 $xw->startElement("arg" . $cnt);
                                 $xw->writeAttribute("type", $fnc_args);
